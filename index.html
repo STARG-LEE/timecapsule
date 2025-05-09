@@ -2,40 +2,161 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>AI 일정 생성기 (n8n + Gemini + Google Calendar)</title>
+  <title>미래의 나에게 타임캡슐 Q&A</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: 'Noto Sans KR', sans-serif; max-width: 480px; margin: 48px auto; background: #f8fafc; }
-    h2 { color: #2d3748; }
-    form { display: flex; gap: 8px; margin-bottom: 18px; }
-    input[type="text"] { flex: 1; font-size: 1.1em; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; }
-    button { font-size: 1.1em; padding: 10px 18px; background: #4b6cb7; color: #fff; border: none; border-radius: 6px; cursor: pointer; transition: background 0.2s; }
-    button:hover { background: #35518a; }
-    #result { margin-top: 24px; background: #fff; padding: 18px; border-radius: 8px; min-height: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); color: #222; }
+    body { background: #f5f6fa; font-family: 'Segoe UI', 'Pretendard', sans-serif; margin: 0; }
+    .container {
+      max-width: 420px; margin: 40px auto; background: #fff;
+      border-radius: 20px; box-shadow: 0 6px 32px #dfe6e9;
+      padding: 36px 24px 28px 24px;
+      position: relative;
+    }
+    .capsule-emoji {
+      font-size: 2.5em; text-align: center; display: block; margin-bottom: 8px;
+      filter: drop-shadow(0 2px 6px #b2bec3);
+    }
+    h1 { text-align: center; color: #0984e3; margin-bottom: 8px; }
+    .desc { text-align: center; color: #636e72; font-size: 1em; margin-bottom: 24px; }
+    label { display: block; margin-top: 18px; font-weight: bold; color: #2d3436; }
+    input, select, textarea {
+      width: 100%; padding: 12px; margin-top: 6px; border-radius: 10px;
+      border: 1.5px solid #b2bec3; font-size: 1em; box-sizing: border-box;
+      background: #f9fafb; transition: border 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      border: 1.5px solid #0984e3;
+      box-shadow: 0 0 0 2px #d6eaff;
+    }
+    textarea { min-height: 80px; resize: vertical; }
+    .hidden { display: none; }
+    .btn {
+      margin-top: 28px; width: 100%; background: linear-gradient(90deg, #0984e3, #74b9ff);
+      color: #fff; border: none; padding: 15px; border-radius: 10px;
+      font-size: 1.1em; font-weight: bold; cursor: pointer; transition: background 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      box-shadow: 0 2px 8px #dfe6e9;
+    }
+    .btn:hover { background: linear-gradient(90deg, #74b9ff, #0984e3); }
+    .footer { text-align: center; margin-top: 32px; color: #636e72; font-size: 0.95em; }
+    @media (max-width: 500px) {
+      .container { max-width: 98vw; padding: 18px 4vw 18px 4vw; }
+    }
+    .result-card {
+      display: flex; flex-direction: column; align-items: center;
+      background: #eafaf1; border: 2px solid #00b894;
+      color: #00b894; border-radius: 14px; padding: 22px 12px 18px 12px;
+      font-size: 1.15em; font-weight: bold; margin-top: 24px;
+      box-shadow: 0 2px 12px #d0f5e6;
+      animation: fadeIn 0.7s;
+      position: relative;
+    }
+    .result-card .close-btn {
+      position: absolute; top: 8px; right: 12px; background: none; border: none; color: #00b894; font-size: 1.2em; cursor: pointer;
+    }
+    .result-card .check {
+      font-size: 2.2em; margin-bottom: 8px;
+      filter: drop-shadow(0 2px 4px #b2f7cc);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px);}
+      to { opacity: 1; transform: translateY(0);}
+    }
+    .error-card {
+      background: #fff0f0; border: 2px solid #d63031; color: #d63031;
+      box-shadow: 0 2px 12px #ffd6d6;
+    }
   </style>
 </head>
 <body>
-  <h2>AI 일정 생성기</h2>
-  <form id="calendarForm">
-    <input type="text" id="calendarInput" placeholder="예: 내일 오후 3시에 회의 잡아줘" required>
-    <button type="submit">일정 생성</button>
-  </form>
-  <div id="result"></div>
+  <div class="container">
+    <span class="capsule-emoji">🧭</span>
+    <h1>타임캡슐 Q&A</h1>
+    <div class="desc">미래의 나에게 질문 또는 편지를 보내보세요.<br>원하는 시점에 이메일로 도착합니다!</div>
+    <form id="capsuleForm">
+      <label>타입 선택</label>
+      <select id="type" name="type" required onchange="onTypeChange()">
+        <option value="질문">질문</option>
+        <option value="편지">편지</option>
+      </select>
+
+      <div id="questionFields">
+        <label for="contentQ">미래의 나에게 질문</label>
+        <textarea id="contentQ" name="contentQ" placeholder="6개월 뒤의 나는 이 질문에 뭐라고 대답할까?"></textarea>
+        <label for="answer">지금의 나의 예상 답변</label>
+        <textarea id="answer" name="answer" placeholder="지금의 나는 이렇게 생각해요."></textarea>
+      </div>
+
+      <div id="letterFields" class="hidden">
+        <label for="contentL">미래의 나에게 편지</label>
+        <textarea id="contentL" name="contentL" placeholder="6개월 뒤의 나는 이 편지를 읽고 어떻게 생각할까?"></textarea>
+      </div>
+
+      <label for="due">도착 시점</label>
+      <select id="due" name="due" required>
+        <option value="1분 후">1분 후(테스트용)</option>
+        <option value="3개월 후">3개월 후</option>
+        <option value="6개월 후">6개월 후</option>
+        <option value="1년 후">1년 후</option>
+      </select>
+
+      <label for="email">이메일 주소</label>
+      <input type="email" id="email" name="email" placeholder="your@email.com" required>
+
+      <button type="submit" class="btn"><span>📨</span>타임캡슐 보내기</button>
+      <div id="result"></div>
+    </form>
+  </div>
+  <div class="footer">
+    © 2025 미래의 나에게 타임캡슐 Q&A
+  </div>
   <script>
-    document.getElementById('calendarForm').onsubmit = async function(e) {
+    function onTypeChange() {
+      const type = document.getElementById('type').value;
+      document.getElementById('questionFields').style.display = (type === '질문') ? 'block' : 'none';
+      document.getElementById('letterFields').style.display = (type === '편지') ? 'block' : 'none';
+    }
+    onTypeChange();
+
+    document.getElementById('capsuleForm').addEventListener('submit', async function(e) {
       e.preventDefault();
-      const input = document.getElementById('calendarInput').value;
-      document.getElementById('result').innerText = '처리 중...';
+      const type = document.getElementById('type').value;
+      const content = type === '질문'
+        ? document.getElementById('contentQ').value.trim()
+        : document.getElementById('contentL').value.trim();
+      const answer = type === '질문' ? document.getElementById('answer').value.trim() : '';
+      const due = document.getElementById('due').value;
+      const email = document.getElementById('email').value.trim();
+
+      if (!content || !email) {
+        showResult('내용과 이메일을 모두 입력해 주세요.', true);
+        return;
+      }
+
       try {
-        const res = await fetch('https://star-g.store/webhook/gemini-calendar', {
+        const res = await fetch('https://star-g.store/webhook/timecapsule', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: input })
+          body: JSON.stringify({ type, content, answer, due, email })
         });
-        const data = await res.json();
-        document.getElementById('result').innerText = data.message || JSON.stringify(data, null, 2);
+        if (res.ok) {
+          showResult('타임캡슐이 성공적으로 등록되었습니다! 미래의 나를 기대해보세요.');
+          document.getElementById('capsuleForm').reset();
+          onTypeChange();
+        } else {
+          showResult('오류가 발생했습니다. 잠시 후 다시 시도해 주세요.', true);
+        }
       } catch (err) {
-        document.getElementById('result').innerText = '오류가 발생했습니다: ' + err;
+        showResult('네트워크 오류가 발생했습니다.', true);
       }
+    });
+
+    function showResult(msg, isError) {
+      const el = document.getElementById('result');
+      el.innerHTML = isError
+        ? `<div class="result-card error-card"><button class="close-btn" onclick="this.parentNode.remove()">×</button>❗️ ${msg}</div>`
+        : `<div class="result-card"><button class="close-btn" onclick="this.parentNode.remove()">×</button><span class="check">✅</span>${msg}</div>`;
     }
   </script>
 </body>
