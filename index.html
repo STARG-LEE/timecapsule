@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>AI 일정 생성기 (n8n + Gemini + Google Calendar)</title>
+  <style>
+    body { font-family: 'Noto Sans KR', sans-serif; max-width: 480px; margin: 48px auto; background: #f8fafc; }
+    h2 { color: #2d3748; }
+    form { display: flex; gap: 8px; margin-bottom: 18px; }
+    input[type="text"] { flex: 1; font-size: 1.1em; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; }
+    button { font-size: 1.1em; padding: 10px 18px; background: #4b6cb7; color: #fff; border: none; border-radius: 6px; cursor: pointer; transition: background 0.2s; }
+    button:hover { background: #35518a; }
+    #result { margin-top: 24px; background: #fff; padding: 18px; border-radius: 8px; min-height: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); color: #222; }
+  </style>
+</head>
+<body>
+  <h2>AI 일정 생성기</h2>
+  <form id="calendarForm">
+    <input type="text" id="calendarInput" placeholder="예: 내일 오후 3시에 회의 잡아줘" required>
+    <button type="submit">일정 생성</button>
+  </form>
+  <div id="result"></div>
+  <script>
+    document.getElementById('calendarForm').onsubmit = async function(e) {
+      e.preventDefault();
+      const input = document.getElementById('calendarInput').value;
+      document.getElementById('result').innerText = '처리 중...';
+      try {
+        const res = await fetch('https://star-g.store/webhook/gemini-calendar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: input })
+        });
+        const data = await res.json();
+        document.getElementById('result').innerText = data.message || JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('result').innerText = '오류가 발생했습니다: ' + err;
+      }
+    }
+  </script>
+</body>
+</html> 
